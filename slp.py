@@ -1,24 +1,63 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
+#Get mnist object
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
-inImage = tf.placeholder(tf.float32, shape=[None, 784])
-gt = tf.placeholder(tf.float32, shape=[None, 10])
-W = tf.Variable(tf.zeros([784,10]))
-b = tf.Variable(tf.zeros([10]))
-est = tf.matmul(inImage, W) + b
-loss = tf.reduce_mean(tf.square(gt - est))/2
-opt = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
+#Input image is 28 x 28
+#Placeholders
+inImage = tf.placeholder(tf.float32, shape=[None, 784], name="inImage")
+gt = tf.placeholder(tf.float32, shape=[None, 10], name="gt")
+
+#Variables to learn
+W = tf.Variable(tf.zeros([784,10]), name="W")
+b = tf.Variable(tf.zeros([10]), name = "B")
+
+#Operations
+with tf.name_scope("est"):
+    est = tf.matmul(inImage, W) + b
+    #est = tf.nn.softmax(tf.matmul(inImage, W) + b)
+with tf.name_scope("loss"):
+    loss = tf.reduce_mean(tf.square(gt - est))/2
+    #loss = tf.reduce_mean(-tf.reduce_sum(gt * tf.log(est), reduction_indices=[1]))
+with tf.name_scope("optimizer"):
+    opt = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
 
 #Calculate accuracy
-correct_prediction = tf.equal(tf.argmax(est, 1), tf.argmax(gt, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+with tf.name_scope("accuracy"):
+    correct_prediction = tf.equal(tf.argmax(est, 1), tf.argmax(gt, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-init = tf.initialize_all_variables()
+#Tensorboard visualizations
+tf.scalar_summary('loss', loss)
+tf.scalar_summary('accuracy', accuracy)
+tf.histogram_summary('inImage', inImage)
+tf.histogram_summary('gt', gt)
+tf.histogram_summary('est', est)
+tf.histogram_summary('W', W)
+tf.histogram_summary('b', b)
+tf.image_summary("weights", tf.reshape(tf.transpose(W), (10, 28, 28, 1)), max_images=10)
+
+#Initialization
 sess = tf.Session()
-sess.run(init)
+sess.run(tf.initialize_all_variables())
+
+#Summary writer
+mergedSummary = tf.merge_all_summaries()
+train_writer = tf.train.SummaryWriter("output/train", sess.graph)
+test_writer = tf.train.SummaryWriter("output/test")
+
+#Evaluation
 for i in range(1000):
-    batch_input, batch_gt = mnist.train.next_batch(100)
+    print "Timestep: ", i
+    #Get input and gt of batch size 100
+    batch_input, batch_gt = mnist.train.next_batch(256)
+    #Run optimizer
     sess.run(opt, feed_dict={inImage: batch_input, gt: batch_gt})
-    print "Loss on step", i, ":", sess.run(loss, feed_dict={inImage:batch_input, gt:batch_gt})
-    print "Accuracy on step", i, ":", sess.run(accuracy, feed_dict={inImage: batch_input, gt: batch_gt})
+
+    #Run summary on test every 10 timesteps
+    if(i % 10 == 0):
+        #Run summary on train
+        train_summary = sess.run(mergedSummary, feed_dict={inImage: batch_input, gt: batch_gt})
+        train_writer.add_summary(train_summary, i)
+        test_summary = sess.run(mergedSummary, feed_dict={inImage: mnist.test.images, gt: mnist.test.labels})
+        test_writer.add_summary(test_summary, i)
