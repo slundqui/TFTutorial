@@ -17,3 +17,7 @@ To run tensorboard, navigate to the directory containing the output directory an
 tensorboard --logdir=output --port=1111
 ```
 
+To view, open a web browser and type the following address into the address bar:
+
+<localhost:1111>
+
