@@ -18,7 +18,8 @@ with tf.name_scope("est"):
     #est = tf.nn.softmax(tf.matmul(inImage, W) + b)
 with tf.name_scope("loss"):
     loss = tf.reduce_mean(tf.square(gt - est))/2
-    #loss = tf.reduce_mean(-tf.reduce_sum(gt * tf.log(est), reduction_indices=[1]))
+    #loss = tf.reduce_mean(-tf.reduce_sum(gt * tf.log(est),
+    #    reduction_indices=[1]))
 with tf.name_scope("optimizer"):
     opt = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
 
@@ -28,27 +29,28 @@ with tf.name_scope("accuracy"):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 #Tensorboard visualizations
-tf.scalar_summary('loss', loss)
-tf.scalar_summary('accuracy', accuracy)
-tf.histogram_summary('inImage', inImage)
-tf.histogram_summary('gt', gt)
-tf.histogram_summary('est', est)
-tf.histogram_summary('W', W)
-tf.histogram_summary('b', b)
-tf.image_summary("weights", tf.reshape(tf.transpose(W), (10, 28, 28, 1)), max_images=10)
+tf.summary.scalar('loss', loss)
+tf.summary.scalar('accuracy', accuracy)
+tf.summary.histogram('inImage', inImage)
+tf.summary.histogram('gt', gt)
+tf.summary.histogram('est', est)
+tf.summary.histogram('W', W)
+tf.summary.histogram('b', b)
+tf.summary.image("weights", tf.reshape(tf.transpose(W), (10, 28, 28, 1)),
+        max_outputs=10)
 
 #Initialization
 sess = tf.Session()
-sess.run(tf.initialize_all_variables())
+sess.run(tf.global_variables_initializer())
 
 #Summary writer
-mergedSummary = tf.merge_all_summaries()
-train_writer = tf.train.SummaryWriter("output/train", sess.graph)
-test_writer = tf.train.SummaryWriter("output/test")
+mergedSummary = tf.summary.merge_all()
+train_writer = tf.summary.FileWriter("output/train", sess.graph)
+test_writer = tf.summary.FileWriter("output/test")
 
 #Evaluation
 for i in range(1000):
-    print "Timestep: ", i
+    print("Timestep: ", i)
     #Get input and gt of batch size 100
     batch_input, batch_gt = mnist.train.next_batch(256)
     #Run optimizer
@@ -57,7 +59,10 @@ for i in range(1000):
     #Run summary on test every 10 timesteps
     if(i % 10 == 0):
         #Run summary on train
-        train_summary = sess.run(mergedSummary, feed_dict={inImage: batch_input, gt: batch_gt})
+        train_summary = sess.run(mergedSummary,
+                feed_dict={inImage: batch_input, gt: batch_gt})
         train_writer.add_summary(train_summary, i)
-        test_summary = sess.run(mergedSummary, feed_dict={inImage: mnist.test.images, gt: mnist.test.labels})
+        #Run summary on test
+        test_summary = sess.run(mergedSummary,
+                feed_dict={inImage: mnist.test.images, gt: mnist.test.labels})
         test_writer.add_summary(test_summary, i)
